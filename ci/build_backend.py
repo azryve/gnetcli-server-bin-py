@@ -5,8 +5,8 @@
 from setuptools import build_meta as build_meta_orig
 from setuptools.build_meta import *
 
-# from .download_release import download_binary
+from .download_release import download_binary
 
 def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
-    # download_binary(config_settings or {})
+    download_binary(config_settings or {})
     return build_meta_orig.build_wheel(wheel_directory, config_settings, metadata_directory)

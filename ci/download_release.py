@@ -7,39 +7,33 @@ import urllib.error
 import tempfile
 import ssl
 import shutil
-import certifi
+import tomllib
 from pathlib import Path
 
-# set this to your upstream
-OWNER = "annetutil"
-REPO = "gnetcli"
+import certifi
 
+# set this to your upstream
+REPO = "https://github.com/annetutil/gnetcli"
+
+# Converts PEP 425 platform tag into a golang system name
+# https://packaging.python.org/en/latest/specifications/platform-compatibility-tags/
+# https://go.dev/src/internal/syslist/syslist.go
+PYTHON_PLATFORM_TO_GOSYSTEM = {
+    "manylinux_2_17_x86_64": ("linux",   "amd64"),
+    "macosx_10_9_x86_64":    ("darwin",  "amd64"),
+    # "macosx_11_0_arm64":     ("darwin",  "arm64"),
+    # "win_amd64":             ("windows", "amd64"),
+}
 
 def read_project_version() -> str:
     pyproject = Path("pyproject.toml")
     if not pyproject.exists():
         raise SystemExit("pyproject.toml not found, cannot determine version")
-    # Python 3.11+ has tomllib
-    try:
-        import tomllib  # type: ignore
-    except ModuleNotFoundError:
-        raise SystemExit("tomllib not available, need Python 3.11+ to read package version")
     data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
     try:
         return data["project"]["version"]
     except KeyError:
         raise SystemExit("project.version not found in pyproject.toml")
-
-
-def get_target(config: dict):
-    plat = config.get("platform-name") if config else None
-    if not plat:
-        raise SystemExit("missing required build option: -C platform-name=<os>/<arch>")
-    parts = plat.split("/", 1)
-    if len(parts) != 2:
-        raise SystemExit(f"invalid platform-name {plat!r}, expected <os>/<arch>")
-    os_name, arch = parts
-    return os_name, arch
 
 def download(url: str, dst: Path) -> None:
     ssl_context = ssl.create_default_context(cafile=certifi.where())
@@ -59,15 +53,26 @@ def extract_binary(tar_path: Path, dest_dir: Path) -> Path:
                 tf.extract(m, dest_dir)
     return dest_dir / "gnetcli_server"
 
+def get_plat_name(config_settings: dict[str, list[str]] | None) -> str | None:
+    build_options: list[str] = []
+    if config_settings:
+        build_options = config_settings.get("--build-option", [])
+    try:
+        plat_name_idx = build_options.index("--plat-name")
+    except ValueError:
+        return None
+    return build_options[plat_name_idx+1]
 
 def download_binary(config_settings: dict) -> None:
     pkg_bin = Path("gnetcli_server_bin") / "_bin"
     binary_path = pkg_bin / "gnetcli_server"
-
-    os_name, arch = get_target(config_settings)
     version = read_project_version()
+
+    plat_pname = get_plat_name(config_settings)
+    os_name, arch = PYTHON_PLATFORM_TO_GOSYSTEM[plat_pname]
+
     asset = f"gnetcli_server-v{version}-{os_name}-{arch}.tar.gz"
-    url = f"https://github.com/{OWNER}/{REPO}/releases/download/v{version}/{asset}"
+    url = f"{REPO}/releases/download/v{version}/{asset}"
 
     tmpdir = Path(tempfile.mkdtemp())
     tar_path = tmpdir / asset
@@ -87,6 +92,6 @@ def download_binary(config_settings: dict) -> None:
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("platform_name", help="Platform in <os>/<arch> format: darwin/amd64, linux/amd64")
+    p.add_argument("plat_name", help="Platform in <os>/<arch> format: darwin/amd64, linux/amd64")
     args = p.parse_args()
-    download_binary({"platform-name": args.platform_name})
+    download_binary({"--build-option": ["--plat-name", args.plat_name]})
