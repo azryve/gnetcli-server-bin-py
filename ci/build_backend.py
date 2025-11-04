@@ -11,6 +11,7 @@ import tomllib
 from pathlib import Path
 
 import certifi
+import packaging.version
 
 from setuptools import build_meta as build_meta_orig
 from setuptools.build_meta import *
@@ -38,15 +39,23 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
     )
 
 
-def read_project_version() -> str:
+def get_upstream_version() -> str:
+    """
+    Determine gnetcli upstream version release
+    Based on the version of pyproject itself
+    """
     pyproject = Path("pyproject.toml")
     if not pyproject.exists():
         raise SystemExit("pyproject.toml not found, cannot determine version")
     data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
     try:
-        return data["project"]["version"]
+        pyproject_version = data["project"]["version"]
     except KeyError:
         raise SystemExit("project.version not found in pyproject.toml")
+    # strip pre/post/dev/local version segment leaving only semver
+    # "1.2.3.post1" -> "1.2.3", "1.2.3rc1" -> "1.2.3"
+    ver = packaging.version.parse(pyproject_version)
+    return ver.base_version
 
 
 def download(url: str, dst: Path) -> None:
@@ -86,7 +95,7 @@ def get_plat_name(config_settings: dict[str, list[str]] | None) -> str | None:
 def download_binary(config_settings: dict) -> None:
     pkg_bin = Path("gnetcli_server_bin") / "_bin"
     binary_path = pkg_bin / "gnetcli_server"
-    version = read_project_version()
+    version = get_upstream_version()
 
     plat_pname = get_plat_name(config_settings)
     os_name, arch = PYTHON_PLATFORM_TO_GOSYSTEM[plat_pname]
