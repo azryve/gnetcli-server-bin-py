@@ -1,4 +1,6 @@
 __pycache__
 dist/
+build/
 *.egg-info/
 NOTES
+gnetcli_server_bin/_bin/gnetcli_server
