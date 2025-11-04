@@ -22,8 +22,10 @@ REPO = "https://github.com/annetutil/gnetcli"
 # https://packaging.python.org/en/latest/specifications/platform-compatibility-tags/
 # https://go.dev/src/internal/syslist/syslist.go
 PYTHON_PLATFORM_TO_GOSYSTEM = {
-    "manylinux_2_17_x86_64": ("linux", "amd64"),
-    "macosx_10_9_x86_64": ("darwin", "amd64"),
+    "manylinux_2_17_x86_64":   ("linux", "amd64"),
+    "macosx_11_0_x86_64":      ("darwin", "amd64"),
+    "macosx_11_0_arm64":       ("darwin", "arm64"), # upstream does not build those
+    "macosx_11_0_universal2":  ("darwin", "amd64"), # this is false, its a amd64 binary, go combiler cant build universal executable
     # "macosx_11_0_arm64":     ("darwin",  "arm64"),
     # "win_amd64":             ("windows", "amd64"),
 }
@@ -111,7 +113,7 @@ def download_binary(config_settings: dict) -> None:
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument(
-        "plat_name", help="Platform in <os>/<arch> format: darwin/amd64, linux/amd64"
+        "plat_name", help="Platform in <os>/<arch>", choices=PYTHON_PLATFORM_TO_GOSYSTEM.keys(),
     )
     args = p.parse_args()
     download_binary({"--build-option": ["--plat-name", args.plat_name]})
