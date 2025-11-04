@@ -7,15 +7,21 @@ sdist:
 
 wheels:
 	@git clean -fxd --exclude NOTES --exclude dist/
-	python3 -m build --wheel -C=--build-option=--plat-name -C=--build-option=manylinux_2_17_x86_64
+	python3 -m build -C=--build-option=--plat-name -C=--build-option=manylinux_2_17_x86_64
 
 	@git clean -fxd --exclude NOTES --exclude dist/
-	python3 -m build --wheel -C=--build-option=--plat-name -C=--build-option=macosx_11_0_universal2
+	python3 -m build -C=--build-option=--plat-name -C=--build-option=manylinux_2_17_aarch64
+
+	@git clean -fxd --exclude NOTES --exclude dist/
+	python3 -m build -C=--build-option=--plat-name -C=--build-option=macosx_11_0_x86_64
+
+	@git clean -fxd --exclude NOTES --exclude dist/
+	python3 -m build -C=--build-option=--plat-name -C=--build-option=macosx_11_0_arm64
 
 	@git clean -fxd --exclude NOTES --exclude dist/
 
 clean:
-	@git clean -fxd --exclude NOTES --exclude dist/
+	@git clean -fxd --exclude NOTES
 
 test:
 	@set -eu; \
