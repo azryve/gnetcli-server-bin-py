@@ -19,6 +19,10 @@ from setuptools.build_meta import *
 # set this to your upstream
 REPO = "https://github.com/annetutil/gnetcli"
 
+# path to the gnetcli-server binary in package
+OUTPUT_BINARY_NAME = "gnetcli_server"
+OUTPUT_BINARY_PATH = Path("gnetcli_server_bin/_bin") / OUTPUT_BINARY_NAME
+
 # Converts PEP 425 platform tag into a golang GOOS/GOARCH pair
 # https://packaging.python.org/en/latest/specifications/platform-compatibility-tags/
 # https://go.dev/src/internal/syslist/syslist.go
@@ -78,7 +82,7 @@ def extract_binary(tar_path: Path, dest_dir: Path) -> Path:
         for m in tf.getmembers():
             if m.isfile():
                 tf.extract(m, dest_dir)
-    return dest_dir / "gnetcli_server"
+    return dest_dir / OUTPUT_BINARY_NAME
 
 
 def get_plat_name(config_settings: dict[str, list[str]] | None) -> str | None:
@@ -93,8 +97,6 @@ def get_plat_name(config_settings: dict[str, list[str]] | None) -> str | None:
 
 
 def download_binary(config_settings: dict) -> None:
-    pkg_bin = Path("gnetcli_server_bin") / "_bin"
-    binary_path = pkg_bin / "gnetcli_server"
     version = get_upstream_version()
 
     plat_pname = get_plat_name(config_settings)
@@ -110,13 +112,13 @@ def download_binary(config_settings: dict) -> None:
     print(f"downloaded: {url}", file=sys.stderr)
     extracted = extract_binary(tar_path, tmpdir)
 
-    pkg_bin.mkdir(parents=True, exist_ok=True)
-    shutil.move(str(extracted), str(binary_path))
+    OUTPUT_BINARY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(extracted), str(OUTPUT_BINARY_PATH))
     if os.name != "nt":
-        binary_path.chmod(0o755)
+        OUTPUT_BINARY_PATH.chmod(0o755)
 
     shutil.rmtree(tmpdir)
-    print(f"extracted: {binary_path}", file=sys.stderr)
+    print(f"extracted: {OUTPUT_BINARY_PATH}", file=sys.stderr)
 
 
 if __name__ == "__main__":
