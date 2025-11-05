@@ -6,7 +6,7 @@ on:
 
 env:
   BUILD_PYTHON_VERSION: "3.11"
-  BUILD_GO_VERSION: "1.23.x"
+  BUILD_GO_VERSION: "1.23.12"
   # because of manylinux you cant just use setup-go
   CIBW_GO_INSTALL_SNIPPET: |
     set -eux
@@ -16,7 +16,7 @@ env:
       aarch64) goarch=arm64 ;;
       *) echo "Unsupported arch: $arch" >&2; exit 1 ;;
     esac
-    curl -fsSL "https://go.dev/dl/go${BUILD_GO_VERSION}.linux-${goarch}.tar.gz" -o /tmp/go.tgz
+    curl -fsSL "https://go.dev/dl/go1.23.12.linux-${goarch}.tar.gz" -o /tmp/go.tgz
     rm -rf /usr/local/go
     tar -C /usr/local -xzf /tmp/go.tgz
     export PATH="/usr/local/go/bin:$PATH"
