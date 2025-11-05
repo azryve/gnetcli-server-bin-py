@@ -19,12 +19,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download release assets
-        uses: dawidd6/action-download-release-asset@v2
-        with:
-          owner: ${{ github.repository_owner }}
-          repo: ${{ github.event.repository.name }}
-          tag: ${{ github.event.release.tag_name }}
-          path: dist/
+        run: |
+          gh release download \
+            "${{ github.event.release.tag_name }}" \
+            --repo "${{ github.repository }}" \
+            --dir dist/
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
