@@ -1,5 +1,6 @@
 # include custom wheel backend
-graft ci
+graft gnetcli_build_backend/
+
 # include source tarball into sdist
 include gnetcli.tar.gz
 
