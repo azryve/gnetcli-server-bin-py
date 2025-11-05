@@ -19,8 +19,7 @@ env:
     curl -fsSL "https://go.dev/dl/go1.23.12.linux-${goarch}.tar.gz" -o /tmp/go.tgz
     rm -rf /usr/local/go
     tar -C /usr/local -xzf /tmp/go.tgz
-    export PATH="/usr/local/go/bin:$PATH"
-    go version
+    /usr/local/go/bin/go env
 
 jobs:
   build-linux:
@@ -40,6 +39,7 @@ jobs:
         env:
           CIBW_ARCHS_LINUX: "x86_64 aarch64"
           CIBW_BEFORE_ALL_LINUX: ${{ env.CIBW_GO_INSTALL_SNIPPET }}
+          CIBW_ENVIRONMENT_LINUX: 'PATH="/usr/local/go/bin:$PATH"'
         run: python -m cibuildwheel --platform linux --output-dir wheelhouse
 
       - name: Upload wheels
