@@ -69,6 +69,7 @@ jobs:
       - name: Build wheels
         env:
           CIBW_ARCHS_MACOS: "x86_64 arm64"
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
         run: python -m cibuildwheel --platform macos --output-dir wheelhouse
 
       - name: Upload wheels
