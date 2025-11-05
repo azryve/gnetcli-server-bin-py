@@ -27,6 +27,8 @@ OUTPUT_BINARY_PATH = Path("gnetcli_server_bin/_bin") / OUTPUT_BINARY_NAME
 def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
     config_settings = config_settings or {}
     determine_target_platform(config_settings)
+    download_tarball(SOURCE_TARBALL_NAME)
+    atexit.register(Path(SOURCE_TARBALL_NAME).unlink, missing_ok=True)
     build_binary(config_settings)
     return build_meta_orig.build_wheel(wheel_directory, config_settings, metadata_directory)
 
@@ -57,6 +59,11 @@ def get_upstream_version() -> str:
 
 
 def download_tarball(dst: str) -> None:
+    path = Path(dst)
+    if path.exists():
+        print(f"tarball already exists: {dst}", file=sys.stderr)
+        return
+
     version = get_upstream_version()
     url = f"https://api.github.com/repos/{GITHUB_REPO}/tarball/v{version}"
     ssl_context = ssl.create_default_context(cafile=certifi.where())
