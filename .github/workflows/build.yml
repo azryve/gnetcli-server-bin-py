@@ -105,6 +105,7 @@ jobs:
 
       - name: Run module help
         run: |
+          cd /tmp/
           python -m gnetcli_server_bin -help
 
   test-macos:
@@ -135,4 +136,5 @@ jobs:
 
       - name: Run module help
         run: |
+          cd /tmp/
           python -m gnetcli_server_bin -help
