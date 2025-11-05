@@ -19,6 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release download \
             "${{ github.event.release.tag_name }}" \
