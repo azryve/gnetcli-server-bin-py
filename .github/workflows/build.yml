@@ -5,7 +5,7 @@ on:
   workflow_dispatch: {}
 
 env:
-  BUILD_PYTHON_VERSION: "3.11"
+  BUILD_PYTHON_VERSION: "3.10"
   BUILD_GO_VERSION: "1.23.12"
   CIBW_BUILD: "cp311-macosx* cp311-manylinux*"
 
