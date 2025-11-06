@@ -5,9 +5,13 @@ on:
   workflow_dispatch: {}
 
 env:
-  BUILD_PYTHON_VERSION: "3.10"
+  BUILD_PYTHON_VERSION: "3.11"
   BUILD_GO_VERSION: "1.23.12"
   CIBW_BUILD: "cp311-macosx* cp311-manylinux*"
+
+  # its not ideal but its a simplest method to fix deallocate stuff
+  # https://cibuildwheel.pypa.io/en/stable/faq/#macos-library-dependencies-do-not-satisfy-target-macos
+  MACOSX_DEPLOYMENT_TARGET: 11.0
 
   # aarch64 does not work too good in qemu
   CIBW_ARCHS_LINUX: "x86_64"
