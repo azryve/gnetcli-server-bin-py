@@ -171,7 +171,7 @@ def binary_go_build(src_root: Path, goos: str, goarch: str) -> Path:
     env["GOARCH"] = goarch
     tmpdir = Path(tempfile.mkdtemp())
     out_path = tmpdir / OUTPUT_BINARY_NAME
-    cmd = ["go", "build", "-o", str(out_path), f"./cmd/{OUTPUT_BINARY_NAME}"]
+    cmd = ["go", "build", "-trimpath", "-ldflags=-s -w -extldflags '-static'", "-o", str(out_path), f"./cmd/{OUTPUT_BINARY_NAME}"]
 
     print(f"building: {' '.join(cmd)} (GOOS={goos} GOARCH={goarch}) cwd={src_root}", file=sys.stderr)
     subprocess.run(cmd, cwd=str(src_root), env=env, check=True)
@@ -197,16 +197,21 @@ def binaries_finalize(goos: str, binaries: list[Path]) -> Path:
         raise SystemExit(f"no binaries found")
 
     if len(binaries) == 1:
-        binary = binaries[0]
+        final_binary = binaries[0]
     elif len(binaries) > 1 and goos == "darwin":
-        binary = binaries_combine_darwin(binaries)
+        final_binary = binaries_combine_darwin(binaries)
     else:
         raise SystemExit(f"multiple binaries not supported for os {goos}")
 
-    if os.name != "nt":
-        binary.chmod(0o755)
+    if shutil.which("upx") and goos != "darwin":
+        cmd = ["upx", "--ultra-brute", "--best", str(final_binary)]
+        print(f"compressing: {' '.join(cmd)}", file=sys.stderr)
+        subprocess.run(cmd, check=True)
 
-    return binary
+    if os.name != "nt":
+        final_binary.chmod(0o755)
+
+    return final_binary
 
 
 def build_binary(config_settings: dict) -> None:
