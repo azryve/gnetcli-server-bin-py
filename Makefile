@@ -7,7 +7,7 @@ sdist:
 
 wheel:
 	@git clean -fxd --exclude NOTES --exclude dist/
-	python3 -m build -C=--build-option=--plat-name -C=--build-option=macosx_11_0_arm64
+	python3 -m build
 	@git clean -fxd --exclude NOTES --exclude dist/
 # 	python3 -m build -C=--build-option=--plat-name -C=--build-option=manylinux_2_17_x86_64
 # 	python3 -m build -C=--build-option=--plat-name -C=--build-option=manylinux_2_17_aarch64

@@ -153,6 +153,8 @@ def go_platform_from_tag(platform_tag: str) -> tuple[str, list[str]]:
             return "darwin", ["amd64"]
         if "arm64" in p:
             return "darwin", ["arm64"]
+        if "universal2" in p:
+            return "darwin", ["amd64", "arm64"]
         raise SystemExit(f"unsupported macos platform tag: {platform_tag!r}")
 
     if p.startswith("win"):
@@ -167,25 +169,44 @@ def binary_go_build(src_root: Path, goos: str, goarch: str) -> Path:
     env = os.environ.copy()
     env["GOOS"] = goos
     env["GOARCH"] = goarch
-
     tmpdir = Path(tempfile.mkdtemp())
-
     out_path = tmpdir / OUTPUT_BINARY_NAME
     cmd = ["go", "build", "-o", str(out_path), f"./cmd/{OUTPUT_BINARY_NAME}"]
+
     print(f"building: {' '.join(cmd)} (GOOS={goos} GOARCH={goarch}) cwd={src_root}", file=sys.stderr)
     subprocess.run(cmd, cwd=str(src_root), env=env, check=True)
+
     print(f"built: {out_path}", file=sys.stderr)
+    return out_path
+
+
+def binaries_combine_darwin(binaries: list[Path]) -> Path:
+    tmpdir = Path(tempfile.mkdtemp())
+    out_path = tmpdir / OUTPUT_BINARY_NAME
+    cmd = ["lipo", "-create", "-o", str(out_path)] + [str(x) for x in binaries]
+
+    print(f"combining: {' '.join(cmd)}", file=sys.stderr)
+    subprocess.run(cmd, check=True)
+
+    print(f"combined: {out_path}", file=sys.stderr)
     return out_path
 
 
 def binaries_finalize(goos: str, binaries: list[Path]) -> Path:
     if not binaries:
         raise SystemExit(f"no binaries found")
-    if len(binaries) > 1:
-        raise SystemExit(f"multiple binaries not supported")
+
+    if len(binaries) == 1:
+        binary = binaries[0]
+    elif len(binaries) > 1 and goos == "darwin":
+        binary = binaries_combine_darwin(binaries)
+    else:
+        raise SystemExit(f"multiple binaries not supported for os {goos}")
+
     if os.name != "nt":
-        binaries[0].chmod(0o755)
-    return binaries[0]
+        binary.chmod(0o755)
+
+    return binary
 
 
 def build_binary(config_settings: dict) -> None:
