@@ -161,16 +161,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download linux wheels
+      - name: Download linux x86_64 wheels
         uses: actions/download-artifact@v4
         with:
           name: wheels-linux
           path: dist
 
-      - name: Download macOS wheels
+      - name: Download macOS x86_64 wheels
         uses: actions/download-artifact@v4
         with:
-          name: wheels-${{ matrix.os }} # wheels-macos-13, wheels-macos-14
+          name: wheels-macos-13
+          path: dist
+
+      - name: Download macOS arm64 wheels
+        uses: actions/download-artifact@v4
+        with:
+          name: wheels-macos-14
           path: dist
 
       - name: Build sdist
