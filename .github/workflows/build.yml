@@ -9,11 +9,6 @@ env:
   BUILD_GO_VERSION: "1.23.12"
   CIBW_BUILD: "cp311-macosx* cp311-manylinux*"
 
-  # there is no x86_64 on modern python on modern macos
-  # and we do not support universal2 in build_backend yet
-  CIBW_ARCHS_MACOS: "arm64"
-  MACOSX_DEPLOYMENT_TARGET: "11.0"
-
   # aarch64 does not work too good in qemu
   CIBW_ARCHS_LINUX: "x86_64"
   CIBW_ENVIRONMENT_LINUX: 'PATH="/usr/local/go/bin:$PATH"'
