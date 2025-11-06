@@ -130,37 +130,62 @@ def determine_target_platform(config_settings: dict[str, list[str]]) -> None:
     set_target_platform_name(config_settings, platform_tag)
  
 
-def go_platform_from_tag(platform_tag: str) -> tuple[str, str]:
+def go_platform_from_tag(platform_tag: str) -> tuple[str, list[str]]:
     """
-    Converts PEP 425 platform tag into a golang GOOS/GOARCH pair.
+    Converts PEP 425 platform tag into a golang GOOS and list of GOARCH.
+    The target GOOS is always a single one: linux/darwin/windows.
+    List of GOARCH is nessesary for multi-ach binaries.
+    Example "macosx_10_15_universal2" -> ("darwin", ["amd64", "arm64"]).
 
     https://packaging.python.org/en/latest/specifications/platform-compatibility-tags/
     https://go.dev/src/internal/syslist/syslist.go
-
-    TODO: To support macos universal2  we need to combine amd64/arm64 binaries with lipo:
-    https://dev.to/thewraven/universal-macos-binaries-with-go-1-16-3mm3
     """
     p = platform_tag.lower()
     if p.startswith(("manylinux", "musllinux", "linux")):
         if "x86_64" in p or "amd64" in p:
-            return ("linux", "amd64")
+            return "linux", ["amd64"]
         if "aarch64" in p or "arm64" in p:
-            return ("linux", "arm64")
+            return "linux", ["arm64"]
         raise SystemExit(f"unsupported linux platform tag: {platform_tag!r}")
 
     if p.startswith("macosx"):
         if "x86_64" in p or "intel" in p:
-            return ("darwin", "amd64")
+            return "darwin", ["amd64"]
         if "arm64" in p:
-            return ("darwin", "arm64")
+            return "darwin", ["arm64"]
         raise SystemExit(f"unsupported macos platform tag: {platform_tag!r}")
 
     if p.startswith("win"):
         if "amd64" in p or "x86_64" in p:
-            return ("windows", "amd64")
+            return "windows", ["amd64"]
         raise SystemExit(f"unsupported windows platform tag: {platform_tag!r}")
 
     raise SystemExit(f"unsupported platform tag: {platform_tag!r}")
+
+
+def binary_go_build(src_root: Path, goos: str, goarch: str) -> Path:
+    env = os.environ.copy()
+    env["GOOS"] = goos
+    env["GOARCH"] = goarch
+
+    tmpdir = Path(tempfile.mkdtemp())
+
+    out_path = tmpdir / OUTPUT_BINARY_NAME
+    cmd = ["go", "build", "-o", str(out_path), f"./cmd/{OUTPUT_BINARY_NAME}"]
+    print(f"building: {' '.join(cmd)} (GOOS={goos} GOARCH={goarch}) cwd={src_root}", file=sys.stderr)
+    subprocess.run(cmd, cwd=str(src_root), env=env, check=True)
+    print(f"built: {out_path}", file=sys.stderr)
+    return out_path
+
+
+def binaries_finalize(goos: str, binaries: list[Path]) -> Path:
+    if not binaries:
+        raise SystemExit(f"no binaries found")
+    if len(binaries) > 1:
+        raise SystemExit(f"multiple binaries not supported")
+    if os.name != "nt":
+        binaries[0].chmod(0o755)
+    return binaries[0]
 
 
 def build_binary(config_settings: dict) -> None:
@@ -170,27 +195,20 @@ def build_binary(config_settings: dict) -> None:
         raise SystemExit("wheel build requires --build-option --plat-name <tag>")
     if not tarball.exists():
         raise SystemExit(f"missing tarball")
-
-    goos, goarch = go_platform_from_tag(platform_tag)
-    env = os.environ.copy()
-    env["GOOS"] = goos
-    env["GOARCH"] = goarch
     retcode = subprocess.call(["go", "help"], stdout=subprocess.DEVNULL)
     if retcode != 0:
         raise SystemExit(f"failed to call go compiler")
 
     tmpdir = Path(tempfile.mkdtemp())
-    src_root = extract_tarball(SOURCE_TARBALL_NAME, tmpdir, 1)
+    src_root = extract_tarball(tarball, tmpdir, 1)
 
-    out_path = tmpdir / OUTPUT_BINARY_NAME
-    cmd = ["go", "build", "-o", str(out_path), f"./cmd/{OUTPUT_BINARY_NAME}"]
-    print(f"building: {' '.join(cmd)} (GOOS={goos} GOARCH={goarch}) cwd={src_root}", file=sys.stderr)
-    subprocess.run(cmd, cwd=str(src_root), env=env, check=True)
+    goos, goarches = go_platform_from_tag(platform_tag)
+    binaries: list[Path] = []
+    for goarch in goarches:
+        binary = binary_go_build(src_root, goos, goarch)
+        binaries.append(binary)
+    final_binary = binaries_finalize(goos, binaries)
 
     OUTPUT_BINARY_PATH.parent.mkdir(parents=True, exist_ok=True)
-    shutil.move(str(out_path), str(OUTPUT_BINARY_PATH))
-    if os.name != "nt":
-        OUTPUT_BINARY_PATH.chmod(0o755)
-
-    shutil.rmtree(tmpdir)
-    print(f"built: {OUTPUT_BINARY_PATH}", file=sys.stderr)
+    shutil.move(final_binary, OUTPUT_BINARY_PATH)
+    print(f"built final: {OUTPUT_BINARY_PATH}", file=sys.stderr)
