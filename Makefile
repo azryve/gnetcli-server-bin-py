@@ -19,15 +19,15 @@ clean:
 
 test:
 	@set -eu; \
-	echo Build venv; \
 	tmpdir=$$(mktemp -d); \
 	curdir=$(CURDIR); \
+	echo Build venv "$$tmpdir"; \
 	python3 -mvenv "$$tmpdir"; \
 	echo Install wheel; \
 	cd "$$tmpdir/"; \
 	"$$tmpdir/bin/python" -m pip install -qqq --no-index -f "$$curdir/dist" gnetcli_server_bin; \
 	echo Test calling binary; \
-	"$$tmpdir/bin/python" -m gnetcli_server_bin -help 2>&1 | grep -q conf-file; \
+	"$$tmpdir/bin/gnetcli-server-bin" -help 2>&1 | grep -q conf-file; \
 	echo OK
 
 .PHONY: all sdist wheel clean test

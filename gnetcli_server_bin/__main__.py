@@ -3,6 +3,11 @@ import subprocess
 
 import gnetcli_server_bin
 
-if __name__ == "__main__":
+
+def main():
     binary_path = gnetcli_server_bin.get_binary_path()
     subprocess.check_call([binary_path] + sys.argv[1:])
+
+
+if __name__ == "__main__":
+    main()

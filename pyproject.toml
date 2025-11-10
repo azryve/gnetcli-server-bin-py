@@ -11,6 +11,9 @@ readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "Fedor Zhukov" }]
 
+[project.scripts]
+gnetcli-server-bin = "gnetcli_server_bin.__main__:main"
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["gnetcli_server_bin*"]
