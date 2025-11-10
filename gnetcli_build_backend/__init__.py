@@ -19,26 +19,41 @@ from setuptools import build_meta as build_meta_orig
 from setuptools.build_meta import *
 
 GITHUB_REPO = "annetutil/gnetcli"
-SOURCE_TARBALL_NAME = "gnetcli.tar.gz"
-OUTPUT_BINARY_NAME = "gnetcli_server"
-OUTPUT_BINARY_PATH = Path("gnetcli_server_bin/_bin") / OUTPUT_BINARY_NAME
+OUTPUT_BINARY_PATH = Path("gnetcli_server_bin/_bin")
+GO_BUILD_FLAGS = ["-trimpath", "-ldflags=-s -w -extldflags '-static'"]
+
+# currently we only need cmd/gnetcli_server
+# and would like to control the size of pypi project
+TARGET_BINARIES = ["cmd/gnetcli_server"]
+
+TMP_DIR = Path(tempfile.mkdtemp())
+atexit.register(shutil.rmtree, TMP_DIR, ignore_errors=True)
 
 
 def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
     config_settings = config_settings or {}
     determine_target_platform(config_settings)
-    download_tarball(SOURCE_TARBALL_NAME)
-    atexit.register(Path(SOURCE_TARBALL_NAME).unlink, missing_ok=True)
-    build_binary(config_settings)
+
+    tarball = download_tarball()
+    atexit.register(tarball.unlink)
+
+    src_root = extract_tarball(tarball, strip=1)
+    binaries_build(config_settings, TARGET_BINARIES, src_root, OUTPUT_BINARY_PATH)
     return build_meta_orig.build_wheel(wheel_directory, config_settings, metadata_directory)
 
 
 def build_sdist(sdist_directory, config_settings=None):
     config_settings = config_settings or {}
     determine_target_platform(config_settings)
-    download_tarball(SOURCE_TARBALL_NAME)
-    atexit.register(Path(SOURCE_TARBALL_NAME).unlink, missing_ok=True)
+
+    tarball = download_tarball()
+    atexit.register(tarball.unlink)
+
     return build_meta_orig.build_sdist(sdist_directory, config_settings)
+
+
+def get_tmp_dir() -> Path:
+    return Path(tempfile.mkdtemp(dir=TMP_DIR))
 
 
 def get_upstream_version() -> str:
@@ -58,33 +73,36 @@ def get_upstream_version() -> str:
     return packaging.version.parse(v).base_version
 
 
-def download_tarball(dst: str) -> None:
-    path = Path(dst)
-    if path.exists():
-        print(f"tarball already exists: {dst}", file=sys.stderr)
-        return
-
+def download_tarball() -> Path:
     version = get_upstream_version()
+    tar_path =  Path(f"gnetcli-v{version}.tar.gz")
+
+    if tar_path.exists():
+        print(f"tarball already exists: {tar_path}", file=sys.stderr)
+        return tar_path
+
     url = f"https://api.github.com/repos/{GITHUB_REPO}/tarball/v{version}"
     ssl_context = ssl.create_default_context(cafile=certifi.where())
     req = urllib.request.Request(url)
     try:
         with urllib.request.urlopen(req, context=ssl_context) as r:
-            with open(dst, "wb") as f:
+            with tar_path.open("wb") as f:
                 shutil.copyfileobj(r, f)
     except urllib.error.HTTPError:
         print(f"failed to download from: {url}", file=sys.stderr)
         raise
-    print(f"downloaded source: {url}", file=sys.stderr)
+
+    print(f"downloaded source tarball from: {url} to {tar_path}", file=sys.stderr)
+    return tar_path
 
 
-def extract_tarball(tar_path: Path, dest_dir: Path, strip: int) -> Path:
+def extract_tarball(tar_path: Path, strip: int) -> Path:
     """
     Extracts tgz files stripping <strip> components from the top of the level.
     This is equivalent to 'tar xzf <tar_path> -C <dest_dir> --strip-components=<strip>'.
     Also ignores non-regulars (links, specials, etc.) - only extracts dirs and regular files.
     """
-    dest_dir.mkdir(parents=True, exist_ok=True)
+    src_root = get_tmp_dir()
     with tarfile.open(tar_path, "r:gz") as tf:
         for m in tf.getmembers():
             # allow only dirs and regular files
@@ -97,8 +115,8 @@ def extract_tarball(tar_path: Path, dest_dir: Path, strip: int) -> Path:
                 print(f"extract_tarball: ignoring file due to strip {m.name}", file=sys.stderr)
                 continue
             m.name = str(PurePosixPath(*path.parts[strip:]))
-            tf.extract(m, dest_dir)
-    return dest_dir
+            tf.extract(m, src_root)
+    return src_root
 
 
 def get_target_platform_name(config_settings: dict[str, list[str]] | None) -> str | None:
@@ -165,13 +183,14 @@ def go_platform_from_tag(platform_tag: str) -> tuple[str, list[str]]:
     raise SystemExit(f"unsupported platform tag: {platform_tag!r}")
 
 
-def binary_go_build(src_root: Path, goos: str, goarch: str) -> Path:
+def binary_go_build(src_root: Path, goos: str, goarch: str, target_binary: str) -> Path:
     env = os.environ.copy()
     env["GOOS"] = goos
     env["GOARCH"] = goarch
-    tmpdir = Path(tempfile.mkdtemp())
-    out_path = tmpdir / OUTPUT_BINARY_NAME
-    cmd = ["go", "build", "-trimpath", "-ldflags=-s -w -extldflags '-static'", "-o", str(out_path), f"./cmd/{OUTPUT_BINARY_NAME}"]
+
+    tmp_dir = get_tmp_dir()
+    out_path = tmp_dir / Path(target_binary).name
+    cmd = ["go", "build"] + GO_BUILD_FLAGS + ["-o", str(out_path), f"./{target_binary}"]
 
     print(f"building: {' '.join(cmd)} (GOOS={goos} GOARCH={goarch}) cwd={src_root}", file=sys.stderr)
     subprocess.run(cmd, cwd=str(src_root), env=env, check=True)
@@ -181,8 +200,8 @@ def binary_go_build(src_root: Path, goos: str, goarch: str) -> Path:
 
 
 def binaries_combine_darwin(binaries: list[Path]) -> Path:
-    tmpdir = Path(tempfile.mkdtemp())
-    out_path = tmpdir / OUTPUT_BINARY_NAME
+    tmp_dir = get_tmp_dir()
+    out_path = tmp_dir / binaries[0].name
     cmd = ["lipo", "-create", "-o", str(out_path)] + [str(x) for x in binaries]
 
     print(f"combining: {' '.join(cmd)}", file=sys.stderr)
@@ -199,7 +218,7 @@ def binaries_finalize(goos: str, binaries: list[Path]) -> Path:
     if len(binaries) == 1:
         final_binary = binaries[0]
     elif len(binaries) > 1 and goos == "darwin":
-        final_binary = binaries_combine_darwin(binaries)
+        final_binary = binaries_combine_darwin(tmp_dir, binaries)
     else:
         raise SystemExit(f"multiple binaries not supported for os {goos}")
 
@@ -214,27 +233,23 @@ def binaries_finalize(goos: str, binaries: list[Path]) -> Path:
     return final_binary
 
 
-def build_binary(config_settings: dict) -> None:
-    tarball = Path(SOURCE_TARBALL_NAME)
+def binaries_build(config_settings: dict, target_binaries: str, src_root: Path, out_dir: Path) -> None:
     platform_tag = get_target_platform_name(config_settings)
     if not platform_tag:
         raise SystemExit("wheel build requires --build-option --plat-name <tag>")
-    if not tarball.exists():
-        raise SystemExit(f"missing tarball")
-    retcode = subprocess.call(["go", "help"], stdout=subprocess.DEVNULL)
-    if retcode != 0:
-        raise SystemExit(f"failed to call go compiler")
-
-    tmpdir = Path(tempfile.mkdtemp())
-    src_root = extract_tarball(tarball, tmpdir, 1)
+    if not shutil.which("go"):
+        raise SystemExit(f"failed to find go compiler in PATH")
 
     goos, goarches = go_platform_from_tag(platform_tag)
-    binaries: list[Path] = []
-    for goarch in goarches:
-        binary = binary_go_build(src_root, goos, goarch)
-        binaries.append(binary)
-    final_binary = binaries_finalize(goos, binaries)
+    for target_binary in target_binaries:
+        binaries: list[Path] = []
+        for goarch in goarches:
+            binary = binary_go_build(src_root, goos, goarch, target_binary)
+            binaries.append(binary)
 
-    OUTPUT_BINARY_PATH.parent.mkdir(parents=True, exist_ok=True)
-    shutil.move(final_binary, OUTPUT_BINARY_PATH)
-    print(f"built final: {OUTPUT_BINARY_PATH}", file=sys.stderr)
+        final_binary = binaries_finalize(goos, binaries)
+        print(f"built: {final_binary}", file=sys.stderr)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        shutil.move(final_binary, out_dir)
+
+    print(f"output binaries in: {out_dir}", file=sys.stderr)
