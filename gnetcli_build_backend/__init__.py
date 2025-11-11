@@ -218,7 +218,7 @@ def binaries_finalize(goos: str, binaries: list[Path]) -> Path:
     if len(binaries) == 1:
         final_binary = binaries[0]
     elif len(binaries) > 1 and goos == "darwin":
-        final_binary = binaries_combine_darwin(tmp_dir, binaries)
+        final_binary = binaries_combine_darwin(binaries)
     else:
         raise SystemExit(f"multiple binaries not supported for os {goos}")
 
