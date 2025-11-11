@@ -7,7 +7,7 @@ on:
 env:
   BUILD_PYTHON_VERSION: "3.11"
   BUILD_GO_VERSION: "1.23.12"
-  CIBW_BUILD: "cp311-macosx* cp311-manylinux*"
+  CIBW_BUILD: "cp311-macosx* cp311-manylinux* cp311-win*"
 
   # its not ideal but its a simplest method to fix deallocate stuff
   # https://cibuildwheel.pypa.io/en/stable/faq/#macos-library-dependencies-do-not-satisfy-target-macos
@@ -28,6 +28,8 @@ env:
     rm -rf /usr/local/go
     tar -C /usr/local -xzf /tmp/go.tgz
     /usr/local/go/bin/go env
+
+  CIBW_ARCHS_WINDOWS: AMD64
 
 jobs:
   build-linux:
@@ -86,6 +88,33 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: wheels-${{ matrix.os }} # wheels-macos-15, wheels-macos-15-intel
+          path: wheelhouse/*.whl
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.BUILD_PYTHON_VERSION }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.BUILD_GO_VERSION }}
+
+      - name: Install cibuildwheel
+        run: python -m pip install --upgrade cibuildwheel
+
+      - name: Build wheels
+        run: python -m cibuildwheel --platform windows --output-dir wheelhouse
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-windows
           path: wheelhouse/*.whl
 
   test-linux:
@@ -151,6 +180,37 @@ jobs:
           cd /tmp/
           python -m gnetcli_server_bin -help
 
+  test-windows:
+    runs-on: windows-latest
+    needs: build-windows
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Download built wheels
+        uses: actions/download-artifact@v4
+        with:
+          name: wheels-windows
+          path: wheelhouse
+
+      - name: Install wheel we just built
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --no-index --find-links wheelhouse gnetcli_server_bin
+
+      - name: Run module help
+        run: |
+          cd /tmp/
+          python -m gnetcli_server_bin -help
+
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
@@ -158,6 +218,7 @@ jobs:
     needs:
       - test-linux
       - test-macos
+      - test-windows
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -178,6 +239,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: wheels-macos-15-intel
+          path: dist
+
+      - name: Download windows wheels
+        uses: actions/download-artifact@v4
+        with:
+          name: wheels-windows
           path: dist
 
       - name: Build sdist
