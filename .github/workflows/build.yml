@@ -14,7 +14,7 @@ env:
   MACOSX_DEPLOYMENT_TARGET: 11.0
 
   # aarch64 does not work too good in qemu
-  CIBW_ARCHS_LINUX: "x86_64"
+  CIBW_ARCHS_LINUX: "x86_64 aarch64"
   CIBW_ENVIRONMENT_LINUX: 'PATH="/usr/local/go/bin:$PATH"'
   CIBW_BEFORE_ALL_LINUX: |
     set -eux
