@@ -5,7 +5,7 @@ backend-path = ["."]
 
 [project]
 name = "gnetcli-server-bin"
-version = "v1.1.2rc7"
+version = "v1.1.3rc1"
 description = "Python shim for a prepackaged gnetcli_server binary."
 readme = "README.md"
 requires-python = ">=3.10"
