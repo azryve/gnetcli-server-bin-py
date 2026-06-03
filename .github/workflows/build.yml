@@ -6,7 +6,7 @@ on:
 
 env:
   BUILD_PYTHON_VERSION: "3.11"
-  BUILD_GO_VERSION: "1.23.12"
+  BUILD_GO_VERSION: "1.25.11"
   CIBW_BUILD: "cp311-macosx* cp311-manylinux*"
 
 jobs:
